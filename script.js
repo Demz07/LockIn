@@ -144,13 +144,23 @@ const ParticleFX = (() => {
   let rings = [];
   let rafId = null;
 
+  let resizeTimer = null;
+
   function resize() {
-    const dpr = window.devicePixelRatio || 1;
+    if (!ctx) return;
+    // Cap DPR at 2: a full-screen canvas at DPR 3 doubles fill-rate for zero visible gain on these tiny particles
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = window.innerWidth * dpr;
     canvas.height = window.innerHeight * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  window.addEventListener('resize', resize);
+
+  // Debounced: mobile browsers fire a resize burst on every scroll while the URL bar collapses,
+  // and reallocating a full-screen canvas each time causes visible jank.
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 150);
+  });
   resize();
 
   function getFgColor() {
@@ -159,10 +169,15 @@ const ParticleFX = (() => {
   }
 
   function startLoop() {
-    if (!rafId) rafId = requestAnimationFrame(tick);
+    if (!ctx || rafId) return;
+    rafId = requestAnimationFrame(tick);
   }
 
   function tick() {
+    if (!ctx) {
+      rafId = null;
+      return;
+    }
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     for (let i = rings.length - 1; i >= 0; i--) {
@@ -680,6 +695,12 @@ const DockPhysics = (() => {
   let currentItemSize = 44;
   let currentGap = 8;
   let dynamicMaxScale = MAX_SCALE;
+  let resizeTimer = null;
+
+  // Resting slot centers (viewport px). Refreshed only on structural changes (tab added/removed,
+  // viewport resize) and at the start of each animation frame, so high-frequency touch/pointer
+  // handlers never trigger a forced layout read on mobile.
+  let cachedCenters = [];
 
   function fitDockToViewport() {
     const items = dock.querySelectorAll('.dock-item');
@@ -718,33 +739,6 @@ const DockPhysics = (() => {
     }
   }
 
-  window.addEventListener('resize', () => {
-    fitDockToViewport();
-    startLoop();
-  });
-
-  function getItemState(el) {
-    let st = stateMap.get(el);
-    if (!st) {
-      st = {
-        scale: 1,
-        targetScale: 1,
-        vScale: 0,
-        lift: 0,
-        targetLift: 0,
-        vLift: 0,
-        bounce: 0,
-        vBounce: 0
-      };
-      stateMap.set(el, st);
-    }
-    return st;
-  }
-
-  function startLoop() {
-    if (!rafId) rafId = requestAnimationFrame(step);
-  }
-
   function computeRestCenters(items) {
     const dockRect = dock.getBoundingClientRect();
     const centerX = dockRect.left + dockRect.width / 2;
@@ -761,9 +755,55 @@ const DockPhysics = (() => {
     });
   }
 
+  function cacheCenters() {
+    cachedCenters = computeRestCenters(dock.querySelectorAll('.dock-item'));
+  }
+
+  function primeLayout() {
+    fitDockToViewport();
+    cacheCenters();
+  }
+
+  // Debounced: mobile browsers fire resize bursts while the URL bar collapses during scroll,
+  // and refitting the dock on every event causes jank.
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      primeLayout();
+      startLoop();
+    }, 120);
+  });
+
+  function getItemState(el) {
+    let st = stateMap.get(el);
+    if (!st) {
+      st = {
+        scale: 1,
+        targetScale: 1,
+        vScale: 0,
+        lift: 0,
+        targetLift: 0,
+        vLift: 0,
+        bounce: 0,
+        vBounce: 0,
+        // Last values actually written to the DOM (rest state = inline styles unset)
+        wScale: 1,
+        wLift: 0,
+        wMargin: 0
+      };
+      stateMap.set(el, st);
+    }
+    return st;
+  }
+
+  function startLoop() {
+    if (!rafId) rafId = requestAnimationFrame(step);
+  }
+
   function step() {
     const items = dock.querySelectorAll('.dock-item');
     const centers = computeRestCenters(items);
+    cachedCenters = centers; // keep pointer resolution fresh while animating
     let closestItem = null;
     let minDist = Infinity;
     let moving = false;
@@ -805,8 +845,16 @@ const DockPhysics = (() => {
       const marginPush = Math.max(0, (st.scale - 1) * (currentItemSize * 0.32));
       const totalLift = st.lift - st.bounce;
 
-      item.style.transform = `translate3d(0, ${-totalLift.toFixed(2)}px, 0) scale(${st.scale.toFixed(4)})`;
-      item.style.margin = `0 ${marginPush.toFixed(2)}px`;
+      // Only touch the DOM when a value actually changed — settled items cost nothing per frame
+      if (Math.abs(st.scale - st.wScale) > 0.0008 || Math.abs(totalLift - st.wLift) > 0.04) {
+        item.style.transform = `translate3d(0, ${-totalLift.toFixed(2)}px, 0) scale(${st.scale.toFixed(4)})`;
+        st.wScale = st.scale;
+        st.wLift = totalLift;
+      }
+      if (Math.abs(marginPush - st.wMargin) > 0.25) {
+        item.style.margin = `0 ${marginPush.toFixed(2)}px`;
+        st.wMargin = marginPush;
+      }
 
       if (
         Math.abs(st.targetScale - st.scale) > 0.001 ||
@@ -823,40 +871,60 @@ const DockPhysics = (() => {
       item.classList.toggle('show-tooltip', show);
     });
 
-    if (moving || pointerX !== null) {
+    if (moving) {
       rafId = requestAnimationFrame(step);
     } else {
-      items.forEach(item => {
-        item.style.transform = '';
-        item.style.margin = '';
-      });
+      // Springs settled. If no pointer is held, drop the inline styles once so the
+      // next interaction starts from a clean state; a held pointer keeps its styles.
+      if (pointerX === null) {
+        items.forEach(item => {
+          const st = getItemState(item);
+          if (st.wScale !== 1 || st.wLift !== 0 || st.wMargin !== 0) {
+            item.style.transform = '';
+            item.style.margin = '';
+            st.wScale = 1;
+            st.wLift = 0;
+            st.wMargin = 0;
+          }
+        });
+      }
       rafId = null;
     }
   }
 
   let lastResolvedItem = null;
 
+  // Resolve nearest item purely from cached rest centers — no layout reads in
+  // touch/mouse event handlers (they run at up to 120Hz on mobile).
+  function resolveNearest(x) {
+    const items = dock.querySelectorAll('.dock-item');
+    if (cachedCenters.length !== items.length) {
+      // Rare fallback if structure changed without a syncItems() call
+      cachedCenters = computeRestCenters(items);
+    }
+    let best = null;
+    let bestScore = Infinity;
+    let rawDistForBest = Infinity;
+    items.forEach((item, idx) => {
+      const d = Math.abs(x - (cachedCenters[idx] ?? -Infinity));
+      const score = item === lastResolvedItem ? d - 5 : d;
+      if (score < bestScore) {
+        bestScore = score;
+        rawDistForBest = d;
+        best = item;
+      }
+    });
+    return rawDistForBest < 56 ? best : null;
+  }
+
+  // Initial sizing + center cache (renderCustomDockItems() re-syncs once custom tabs mount)
+  primeLayout();
+
   return {
     setPointer(x) {
       pointerX = x;
       startLoop();
-
-      // Return closest dock item with 5px hysteresis to prevent boundary chatter
-      const items = dock.querySelectorAll('.dock-item');
-      let best = null;
-      let bestScore = Infinity;
-      let rawDistForBest = Infinity;
-      items.forEach(item => {
-        const r = item.getBoundingClientRect();
-        const d = Math.abs(x - (r.left + r.width / 2));
-        const score = item === lastResolvedItem ? d - 5 : d;
-        if (score < bestScore) {
-          bestScore = score;
-          rawDistForBest = d;
-          best = item;
-        }
-      });
-      const resolved = rawDistForBest < 56 ? best : null;
+      const resolved = resolveNearest(x);
       if (resolved) lastResolvedItem = resolved;
       return resolved;
     },
@@ -873,7 +941,7 @@ const DockPhysics = (() => {
       startLoop();
     },
     syncItems() {
-      fitDockToViewport();
+      primeLayout();
       startLoop();
     }
   };
@@ -1311,6 +1379,25 @@ function renderIconPicker() {
   });
 }
 
+// Timestamp of the last open — used to swallow the synthetic click mobile browsers
+// fire right after touchend (it lands on the freshly-opened backdrop and would
+// instantly close the modal, which made "New Tab" appear broken on phones).
+let tabModalOpenedAt = 0;
+
+function presentTabModal() {
+  tabModalOpenedAt = performance.now();
+  tabModalBackdrop.classList.add('open');
+  tabModalBackdrop.setAttribute('aria-hidden', 'false');
+  SoundFX.pop();
+  // Focus synchronously inside the user gesture so iOS opens the keyboard
+  // (a setTimeout focus is rejected by Safari as "not user-activated").
+  try {
+    tabNameInput.focus({ preventScroll: true });
+  } catch (_) {
+    tabNameInput.focus();
+  }
+}
+
 function openNewTabModal() {
   editingTabFilter = null;
   selectedIconKey = 'folder';
@@ -1320,10 +1407,7 @@ function openNewTabModal() {
   tabNameInput.value = '';
   tabError.textContent = '';
   renderIconPicker();
-  tabModalBackdrop.classList.add('open');
-  tabModalBackdrop.setAttribute('aria-hidden', 'false');
-  SoundFX.pop();
-  setTimeout(() => tabNameInput.focus(), 160);
+  presentTabModal();
 }
 
 function openEditTabModal(filterKey) {
@@ -1337,10 +1421,7 @@ function openEditTabModal(filterKey) {
   tabNameInput.value = tab.name;
   tabError.textContent = '';
   renderIconPicker();
-  tabModalBackdrop.classList.add('open');
-  tabModalBackdrop.setAttribute('aria-hidden', 'false');
-  SoundFX.pop();
-  setTimeout(() => tabNameInput.focus(), 160);
+  presentTabModal();
 }
 
 function closeNewTabModal() {
@@ -1351,7 +1432,10 @@ function closeNewTabModal() {
 closeModalBtn.addEventListener('click', closeNewTabModal);
 cancelModalBtn.addEventListener('click', closeNewTabModal);
 tabModalBackdrop.addEventListener('click', (e) => {
-  if (e.target === tabModalBackdrop) closeNewTabModal();
+  if (e.target !== tabModalBackdrop) return;
+  // Ignore the immediate ghost click after opening from the dock's "+" on touch devices
+  if (performance.now() - tabModalOpenedAt < 450) return;
+  closeNewTabModal();
 });
 
 modalDeleteTabBtn.addEventListener('click', () => {
@@ -1780,10 +1864,16 @@ function playFLIP(firstRects) {
     const dy = first.top - last.top;
     if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
       el.style.transition = 'none';
+      el.style.willChange = 'transform';
       el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
       void el.offsetWidth;
       el.style.transition = 'transform 0.36s var(--spring), border-color 0.22s, background-color 0.22s';
       el.style.transform = '';
+      clearTimeout(el._willChangeTimer);
+      el._willChangeTimer = setTimeout(() => {
+        el.style.willChange = '';
+        el._willChangeTimer = null;
+      }, 420);
     }
   });
 }
@@ -1828,6 +1918,11 @@ function renderTasks(opts = {}) {
     if (!keepIds.has(id)) el.remove();
   });
 
+  // Collect cascade targets first so the whole batch needs ONE forced layout
+  // instead of one per card (that per-card reflow was a major mobile jank source
+  // on every dock tab switch).
+  const cascadeItems = [];
+
   filtered.forEach((task, index) => {
     let li = existingMap.get(task.id);
     if (!li) {
@@ -1836,22 +1931,26 @@ function renderTasks(opts = {}) {
         li.classList.add('new-pop');
         setTimeout(() => li.classList.remove('new-pop'), 450);
       } else if (cascade) {
-        li.style.setProperty('--stagger', Math.min(index, 12));
-        li.classList.add('cascade-in');
-        setTimeout(() => li.classList.remove('cascade-in'), 600);
+        cascadeItems.push({ li, index });
       }
     } else {
       updateTaskElement(li, task);
       if (cascade) {
         li.classList.remove('cascade-in');
-        void li.offsetWidth;
-        li.style.setProperty('--stagger', Math.min(index, 12));
-        li.classList.add('cascade-in');
-        setTimeout(() => li.classList.remove('cascade-in'), 600);
+        cascadeItems.push({ li, index });
       }
     }
     taskList.appendChild(li);
   });
+
+  if (cascadeItems.length > 0) {
+    void taskList.offsetWidth; // single batched reflow for the entire list
+    cascadeItems.forEach(({ li, index }) => {
+      li.style.setProperty('--stagger', Math.min(index, 12));
+      li.classList.add('cascade-in');
+      setTimeout(() => li.classList.remove('cascade-in'), 600);
+    });
+  }
 
   if (flip) playFLIP(firstRects);
 }
@@ -1942,6 +2041,8 @@ function createTaskElement(task) {
   li.draggable = currentSort === 'manual';
 
   const metaHtml = buildTaskMetaHTML(task);
+  const subsHtml = buildSubtasksHTML(task);
+  const catHtml = buildCategorySelectOptions(task.category);
   const subTotal = (task.subtasks || []).length;
   const subPct = subTotal > 0 ? Math.round((task.subtasks.filter(s => s.done).length / subTotal) * 100) : 0;
 
@@ -2000,12 +2101,12 @@ function createTaskElement(task) {
             <input type="date" class="date-chip-input drawer-due-input" value="${escapeHtml(task.dueDate || '')}" title="Due Date" />
 
             <select class="select-chip drawer-cat-select" title="Assign Tab">
-              ${buildCategorySelectOptions(task.category)}
+              ${catHtml}
             </select>
           </div>
 
           <div class="subtasks-box">
-            <ul class="subtask-list">${buildSubtasksHTML(task)}</ul>
+            <ul class="subtask-list">${subsHtml}</ul>
             <div class="subtask-add-row">
               <input type="text" class="subtask-input" placeholder="Add a subtask step..." />
               <button type="button" class="subtask-add-btn" data-action="add-sub">Add</button>
@@ -2017,6 +2118,14 @@ function createTaskElement(task) {
       </div>
     </div>
   `;
+
+  // Seed the update-skip caches so the first re-render doesn't re-parse identical HTML
+  const metaRowEl = li.querySelector('.task-meta-row');
+  if (metaRowEl) metaRowEl._cachedHtml = metaHtml;
+  const catSelEl = li.querySelector('.drawer-cat-select');
+  if (catSelEl) catSelEl._cachedHtml = catHtml;
+  const subListEl = li.querySelector('.subtask-list');
+  if (subListEl) subListEl._cachedHtml = subsHtml;
 
   bindTaskCardEvents(li);
   return li;
@@ -2044,7 +2153,12 @@ function updateTaskElement(li, task) {
   const metaRow = li.querySelector('.task-meta-row');
   if (metaRow) {
     const metaHtml = buildTaskMetaHTML(task);
-    metaRow.innerHTML = metaHtml;
+    // Skip identical innerHTML writes — re-parsing every card on every render
+    // (e.g. dock tab scrubbing) caused heavy style/layout churn on mobile.
+    if (metaRow._cachedHtml !== metaHtml) {
+      metaRow._cachedHtml = metaHtml;
+      metaRow.innerHTML = metaHtml;
+    }
     metaRow.classList.toggle('hidden', !metaHtml);
   }
 
@@ -2059,11 +2173,21 @@ function updateTaskElement(li, task) {
 
   const catSelect = li.querySelector('.drawer-cat-select');
   if (catSelect && document.activeElement !== catSelect) {
-    catSelect.innerHTML = buildCategorySelectOptions(task.category);
+    const catHtml = buildCategorySelectOptions(task.category);
+    if (catSelect._cachedHtml !== catHtml) {
+      catSelect._cachedHtml = catHtml;
+      catSelect.innerHTML = catHtml;
+    }
   }
 
   const subList = li.querySelector('.subtask-list');
-  if (subList) subList.innerHTML = buildSubtasksHTML(task);
+  if (subList) {
+    const subsHtml = buildSubtasksHTML(task);
+    if (subList._cachedHtml !== subsHtml) {
+      subList._cachedHtml = subsHtml;
+      subList.innerHTML = subsHtml;
+    }
+  }
 
   const subTrack = li.querySelector('.subtask-progress-track');
   const subFill = li.querySelector('.subtask-progress-fill');
@@ -2130,6 +2254,9 @@ function bindTaskCardEvents(li) {
     if (!isSwiping && Math.abs(dx) > 16 && Math.abs(dx) > Math.abs(dy) * 1.5) {
       isSwiping = true;
       li.style.transition = 'none';
+      // Promote only for the duration of the gesture (persistent will-change on
+      // every card created a compositor layer per task on mobile)
+      li.style.willChange = 'transform';
     }
     if (isSwiping) {
       swipeDx = dx * 0.52;
@@ -2148,6 +2275,11 @@ function bindTaskCardEvents(li) {
     li.classList.remove('swiping-right', 'swiping-left');
     li.style.transition = 'transform 0.36s var(--bounce)';
     li.style.transform = '';
+    clearTimeout(li._willChangeTimer);
+    li._willChangeTimer = setTimeout(() => {
+      li.style.willChange = '';
+      li._willChangeTimer = null;
+    }, 420);
 
     if (swipeDx > 52) {
       if (navigator.vibrate) navigator.vibrate(25);
@@ -2887,9 +3019,10 @@ const gotItInstallBtn = document.getElementById('gotItInstallBtn');
 let deferredInstallPrompt = null;
 
 function isRunningStandalone() {
+  const displayMode = q => (typeof window.matchMedia === 'function' ? window.matchMedia(q).matches : false);
   return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.matchMedia('(display-mode: minimal-ui)').matches ||
+    displayMode('(display-mode: standalone)') ||
+    displayMode('(display-mode: minimal-ui)') ||
     window.navigator.standalone === true
   );
 }
