@@ -124,7 +124,7 @@ const SoundFX = (() => {
     // Kept very short & quiet because a fast scrub fires one per tab crossed.
     scroll(pos = 0) {
       const freq = 460 + Math.max(0, pos) * 32;
-      tone(freq, freq * 1.08, 0.05, 0.028, 'sine', 0);
+      tone(freq, freq * 1.08, 0.06, 0.065, 'sine', 0);
     },
     pop: () => tone(380, 660, 0.065, 0.045, 'sine'),
     uncheck: () => tone(480, 320, 0.06, 0.035, 'sine'),
