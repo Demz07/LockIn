@@ -119,6 +119,13 @@ const SoundFX = (() => {
       return enabled;
     },
     tick: () => tone(520, 380, 0.035, 0.03, 'triangle'),
+    // Soft position-aware blip played when scrolling/hovering across dock tabs:
+    // pitch steps up with the tab's slot so scrubbing feels like a physical ratchet.
+    // Kept very short & quiet because a fast scrub fires one per tab crossed.
+    scroll(pos = 0) {
+      const freq = 460 + Math.max(0, pos) * 32;
+      tone(freq, freq * 1.08, 0.05, 0.028, 'sine', 0);
+    },
     pop: () => tone(380, 660, 0.065, 0.045, 'sine'),
     uncheck: () => tone(480, 320, 0.06, 0.035, 'sine'),
     complete() {
@@ -1164,7 +1171,13 @@ function autoActivateTab(item, mode = 'hover') {
   if (mode === 'scrub' && navigator.vibrate) {
     navigator.vibrate(8);
   }
-  selectTab(item, true);
+
+  // Distinct scroll blip instead of the plain click tick — pitch follows the
+  // tab's position in the dock so dragging over tabs reads as movement
+  const dockItems = dock.querySelectorAll('.dock-item');
+  const slotIndex = Array.prototype.indexOf.call(dockItems, item);
+  SoundFX.scroll(slotIndex);
+  selectTab(item, false);
 }
 
 function handleDesktopHover(e) {
