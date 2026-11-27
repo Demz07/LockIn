@@ -77,6 +77,84 @@
   --ring-track: rgba(0, 0, 0, 0.1);
 }
 
+/* Warm linen & thread — sewn-patch aesthetic */
+[data-theme="stitches"] {
+  --bg: #efe6d6;
+  --fg: #3b3025;
+  --fg-secondary: #5c5041;
+  --card-bg: #faf4e7;
+  --card-hover: #f5eddb;
+  --card-elevated: #fffaf0;
+  --input-bg: #f2e9d7;
+  --border: #c8b391;
+  --border-strong: #a08760;
+  --muted: #8b7a61;
+  --subtle: #e7dbc4;
+  --accent-inv-bg: #46382a;
+  --accent-inv-fg: #faf4e7;
+  --danger: #b93a2b;
+  --danger-soft: rgba(185, 58, 43, 0.12);
+  --dock-bg: rgba(250, 244, 231, 0.88);
+  --dock-item-bg: #efe4cf;
+  --dock-border: rgba(122, 96, 58, 0.4);
+  --backdrop: rgba(59, 48, 37, 0.42);
+  --spotlight: rgba(122, 96, 58, 0.09);
+  --shadow-lg: 0 18px 40px rgba(74, 58, 42, 0.24);
+  --ring-track: rgba(122, 96, 58, 0.2);
+}
+
+/* Neomorphism (soft UI) — borderless extruded surfaces */
+[data-theme="neomorphism"] {
+  --bg: #e5eaf1;
+  --fg: #2c333f;
+  --fg-secondary: #4b5565;
+  --card-bg: #e5eaf1;
+  --card-hover: #eaeff6;
+  --card-elevated: #e9eef5;
+  --input-bg: #e5eaf1;
+  --border: rgba(163, 177, 198, 0);
+  --border-strong: rgba(44, 51, 63, 0.18);
+  --muted: #78859a;
+  --subtle: #d9dfe9;
+  --accent-inv-bg: #2c333f;
+  --accent-inv-fg: #eef2f7;
+  --danger: #d25452;
+  --danger-soft: rgba(210, 84, 82, 0.14);
+  --dock-bg: rgba(229, 234, 241, 0.94);
+  --dock-item-bg: #e5eaf1;
+  --dock-border: transparent;
+  --backdrop: rgba(44, 51, 63, 0.38);
+  --spotlight: rgba(44, 51, 63, 0.07);
+  --shadow-lg: 14px 14px 30px rgba(163, 177, 198, 0.55), -12px -12px 26px rgba(255, 255, 255, 0.85);
+  --ring-track: rgba(44, 51, 63, 0.12);
+}
+
+/* Glossy ceramic — glazed porcelain with specular highlights */
+[data-theme="ceramic"] {
+  --bg: #edf1f7;
+  --fg: #1f2733;
+  --fg-secondary: #414d5e;
+  --card-bg: #ffffff;
+  --card-hover: #f3f6fb;
+  --card-elevated: #ffffff;
+  --input-bg: #f1f4f9;
+  --border: rgba(31, 39, 51, 0.1);
+  --border-strong: rgba(31, 39, 51, 0.28);
+  --muted: #6d7889;
+  --subtle: #e6ebf2;
+  --accent-inv-bg: #ffffff;
+  --accent-inv-fg: #171d27;
+  --danger: #df3b34;
+  --danger-soft: rgba(223, 59, 52, 0.12);
+  --dock-bg: rgba(255, 255, 255, 0.86);
+  --dock-item-bg: #f5f7fb;
+  --dock-border: rgba(255, 255, 255, 0.95);
+  --backdrop: rgba(22, 30, 42, 0.42);
+  --spotlight: rgba(130, 165, 220, 0.14);
+  --shadow-lg: 0 22px 48px rgba(31, 47, 74, 0.2), 0 4px 10px rgba(31, 47, 74, 0.08);
+  --ring-track: rgba(31, 39, 51, 0.1);
+}
+
 :root {
   --spring: cubic-bezier(0.22, 1, 0.36, 1);
   --bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -2682,6 +2760,161 @@ body.has-island .container {
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
+}
+
+/* ==========================================================
+   THEME CHARACTER LAYERS
+   Textures & materials that go beyond the color tokens:
+   Stitches = woven linen + dashed thread seams,
+   Neomorphism = borderless extruded/pressed soft-UI surfaces,
+   Ceramic = glazed porcelain with specular highlights.
+   ========================================================== */
+
+/* ---------- STITCHES: woven fabric + sewn seams ---------- */
+[data-theme="stitches"] body {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(122, 96, 58, 0.05) 0 1px, transparent 1px 5px),
+    repeating-linear-gradient(0deg, rgba(122, 96, 58, 0.05) 0 1px, transparent 1px 5px);
+}
+
+[data-theme="stitches"] .task-item,
+[data-theme="stitches"] .composer-card,
+[data-theme="stitches"] .dock,
+[data-theme="stitches"] .dock-item,
+[data-theme="stitches"] .modal-card,
+[data-theme="stitches"] .icon-btn,
+[data-theme="stitches"] .pill-btn,
+[data-theme="stitches"] .chip,
+[data-theme="stitches"] .search-input-wrap,
+[data-theme="stitches"] .add-btn,
+[data-theme="stitches"] .row-action-btn,
+[data-theme="stitches"] .composer-opt-btn {
+  border-style: dashed;
+  border-width: 1.5px;
+}
+
+/* Inner stitch line framing each task card like a sewn patch */
+[data-theme="stitches"] .task-item::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1.5px dashed rgba(160, 135, 96, 0.5);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+/* ---------- NEOMORPHISM: soft extruded surfaces ---------- */
+[data-theme="neomorphism"] .task-item,
+[data-theme="neomorphism"] .composer-card,
+[data-theme="neomorphism"] .modal-card,
+[data-theme="neomorphism"] .dock,
+[data-theme="neomorphism"] .undo-toast,
+[data-theme="neomorphism"] .trash-popup,
+[data-theme="neomorphism"] .cmd-card,
+[data-theme="neomorphism"] .focus-modal-card {
+  border-color: transparent;
+  box-shadow: 7px 7px 16px rgba(163, 177, 198, 0.6), -7px -7px 16px rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="neomorphism"] .dock-item,
+[data-theme="neomorphism"] .icon-btn,
+[data-theme="neomorphism"] .pill-btn,
+[data-theme="neomorphism"] .chip,
+[data-theme="neomorphism"] .add-btn,
+[data-theme="neomorphism"] .composer-opt-btn,
+[data-theme="neomorphism"] .row-action-btn {
+  border-color: transparent;
+  box-shadow: 3px 3px 8px rgba(163, 177, 198, 0.55), -3px -3px 8px rgba(255, 255, 255, 0.9);
+}
+
+/* Pressed states sink into the surface */
+[data-theme="neomorphism"] .dock-item.active,
+[data-theme="neomorphism"] .pill-btn:active,
+[data-theme="neomorphism"] .chip:active {
+  box-shadow: inset 3px 3px 7px rgba(163, 177, 198, 0.75), inset -3px -3px 7px rgba(255, 255, 255, 0.9);
+}
+
+/* Sunken input wells */
+[data-theme="neomorphism"] .input-field,
+[data-theme="neomorphism"] .search-input,
+[data-theme="neomorphism"] .modal-input,
+[data-theme="neomorphism"] .cmd-input,
+[data-theme="neomorphism"] .drawer-edit-title,
+[data-theme="neomorphism"] .subtask-input,
+[data-theme="neomorphism"] .drawer-notes,
+[data-theme="neomorphism"] .date-chip-input,
+[data-theme="neomorphism"] .select-chip,
+[data-theme="neomorphism"] .focus-task-select,
+[data-theme="neomorphism"] .checkbox {
+  border-color: transparent;
+  box-shadow: inset 3px 3px 7px rgba(163, 177, 198, 0.65), inset -3px -3px 7px rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="neomorphism"] .search-input-wrap {
+  border-color: transparent;
+}
+
+/* ---------- CERAMIC: glazed porcelain, tile grid + sheen ---------- */
+[data-theme="ceramic"] body {
+  background-image:
+    radial-gradient(1100px 480px at 50% -8%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 65%),
+    linear-gradient(rgba(31, 47, 74, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 47, 74, 0.035) 1px, transparent 1px);
+  background-size: auto, 72px 72px, 72px 72px;
+}
+
+[data-theme="ceramic"] .task-item {
+  background: linear-gradient(168deg, #ffffff 0%, #ffffff 58%, #eef3fa 100%);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 26px rgba(31, 47, 74, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -10px 18px rgba(224, 232, 244, 0.5);
+}
+
+[data-theme="ceramic"] .task-item.expanded {
+  box-shadow: 0 18px 38px rgba(31, 47, 74, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="ceramic"] .dock {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(238, 243, 250, 0.9));
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 38px rgba(31, 47, 74, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="ceramic"] .dock-item {
+  background: linear-gradient(180deg, #ffffff, #eef2f8);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 4px 10px rgba(31, 47, 74, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="ceramic"] .dock-item.active {
+  background: linear-gradient(180deg, #ffffff, #e8eef7);
+  box-shadow: 0 6px 14px rgba(31, 47, 74, 0.2), inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+[data-theme="ceramic"] .composer-card,
+[data-theme="ceramic"] .modal-card,
+[data-theme="ceramic"] .cmd-card {
+  background: linear-gradient(168deg, #ffffff 0%, #ffffff 60%, #eff4fa 100%);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 24px 55px rgba(31, 47, 74, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+[data-theme="ceramic"] .input-field,
+[data-theme="ceramic"] .search-input,
+[data-theme="ceramic"] .modal-input,
+[data-theme="ceramic"] .cmd-input,
+[data-theme="ceramic"] .drawer-edit-title,
+[data-theme="ceramic"] .subtask-input,
+[data-theme="ceramic"] .drawer-notes,
+[data-theme="ceramic"] .date-chip-input,
+[data-theme="ceramic"] .select-chip,
+[data-theme="ceramic"] .focus-task-select {
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: inset 0 2px 5px rgba(31, 47, 74, 0.08), inset 0 -1px 0 rgba(255, 255, 255, 0.9);
+}
+
+[data-theme="ceramic"] .icon-btn:hover,
+[data-theme="ceramic"] .pill-btn:hover {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0));
 }
 
 @media (prefers-reduced-motion: reduce) {

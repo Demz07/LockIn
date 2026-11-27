@@ -67,7 +67,10 @@ const BUILTIN_ICONS = {
   done: `<path d="M20 6L9 17l-5-5"/>`
 };
 
-const THEMES = ['oled', 'graphite', 'paper'];
+const THEMES = ['oled', 'graphite', 'paper', 'stitches', 'neomorphism', 'ceramic'];
+
+// Themes with light backgrounds — used for dark particle FX & light-mode cues
+const LIGHT_THEMES = ['paper', 'stitches', 'neomorphism', 'ceramic'];
 
 /* ==========================================================
    SUBTLE PROCEDURAL WEB AUDIO UI SOUNDS
@@ -172,7 +175,7 @@ const ParticleFX = (() => {
 
   function getFgColor() {
     const theme = document.documentElement.getAttribute('data-theme');
-    return theme === 'paper' ? '#09090b' : '#ffffff';
+    return LIGHT_THEMES.includes(theme) ? '#09090b' : '#ffffff';
   }
 
   function startLoop() {
@@ -518,7 +521,10 @@ if (!THEMES.includes(currentTheme)) currentTheme = 'oled';
 const THEME_COLORS = {
   oled: '#000000',
   graphite: '#0f1014',
-  paper: '#f6f6f7'
+  paper: '#f6f6f7',
+  stitches: '#efe6d6',
+  neomorphism: '#e5eaf1',
+  ceramic: '#edf1f7'
 };
 
 function applyTheme(theme) {
@@ -532,6 +538,15 @@ function applyTheme(theme) {
     themeIcon.innerHTML = `<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>`;
   } else if (theme === 'graphite') {
     themeIcon.innerHTML = `<circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M12 8l5-3"/><path d="M12 13l6-3.5"/><path d="M12 18l4-2.5"/>`;
+  } else if (theme === 'stitches') {
+    // Needle pulling a dashed thread
+    themeIcon.innerHTML = `<path d="M4.5 19.5L15 6.5"/><circle cx="16.8" cy="4.7" r="1.9"/><path d="M5.5 13.5c2.6 1.6 5.4 2.2 8.2 1.7" stroke-dasharray="2.5 2.5"/>`;
+  } else if (theme === 'neomorphism') {
+    // Soft extruded rounded square with a pressed inner dot
+    themeIcon.innerHTML = `<rect x="4" y="4" width="16" height="16" rx="6.5"/><circle cx="12" cy="12" r="3"/>`;
+  } else if (theme === 'ceramic') {
+    // Glazed droplet with a specular highlight
+    themeIcon.innerHTML = `<path d="M12 3.5c3.8 4.8 6.5 8.2 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 11.7 8.2 8.3 12 3.5z"/><path d="M9 15.2a3.4 3.4 0 0 1 2.6-3.4"/>`;
   } else {
     themeIcon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
   }
