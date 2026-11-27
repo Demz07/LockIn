@@ -860,7 +860,9 @@ body.has-island .container {
   border-radius: 14px;
   overflow: hidden;
   transition: border-color 0.22s var(--spring), background-color 0.22s var(--spring), box-shadow 0.22s var(--spring), opacity 0.25s ease;
-  will-change: transform;
+  /* No persistent will-change here: one compositor layer per task card bloated
+     memory and hurt scroll performance on mobile. Layers are promoted on demand
+     via inline will-change during swipe / FLIP animations instead. */
 }
 
 /* Radial Pointer-Spotlight Glow */
@@ -1571,7 +1573,7 @@ body.has-island .container {
   border: 1px solid var(--dock-border);
   cursor: pointer;
   transform-origin: bottom center;
-  will-change: transform, margin;
+  will-change: transform;
   transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
   flex-shrink: 0;
 }
@@ -1889,6 +1891,9 @@ body.has-island .container {
 .modal-card {
   width: 100%;
   max-width: 410px;
+  /* Fallback for browsers without dvh: without a max-height the card could
+     overflow small screens with no way to scroll to the Create button */
+  max-height: calc(100vh - 1.7rem);
   max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 1.7rem);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -2654,6 +2659,28 @@ body.has-island .container {
   .trash-icon-circle {
     width: 60px;
     height: 60px;
+  }
+}
+
+/* ==========================================================
+   MOBILE / TOUCH PERFORMANCE
+   Full-strength backdrop blurs re-render every frame the dock
+   or page content changes — the biggest GPU cost on phones.
+   ========================================================== */
+@media (max-width: 820px), (hover: none) {
+  .dock {
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
+  .modal-backdrop {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .trash-overlay {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 }
 
